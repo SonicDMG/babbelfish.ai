@@ -1,12 +1,10 @@
 import os
 from dotenv import load_dotenv
 
-import websocket
-from websocket_server import WebSocketServer
-#from streamlit_autorefresh import st_autorefresh
+import streamlit as st
 from babbelfish_flow import FlowRunner
 from listen_and_convert import TranscribeAudio
-import streamlit as st
+from elevenlabs_component import elevenlabs_component
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,10 +28,6 @@ if "messages" not in st.session_state:
 if "transcriber" not in st.session_state:
     st.session_state.transcriber = None
 
-# Initialize the session state for the text area
-if 'websocket_text' not in st.session_state:
-    st.session_state.websocket_text = ""
-
 # -------------- Define Layout ---------------
 
 st.header(f"This page has run {st.session_state.counter} times.")
@@ -44,11 +38,8 @@ st.image("./static/fish_ear.webp")
 
 st.sidebar.button("Run it again")
 st.sidebar.text_input("Language to translate to", key="language")
-add_transcrption_start = st.sidebar.button("Start transcription")
-add_transcrption_stop = st.sidebar.button("Stop transcription")
-
-# Create a text area in the sidebar with the initial text from the session state
-add_websocket_text = st.sidebar.text_area("Websocket response", st.session_state.websocket_text)
+add_transcrption_start = st.sidebar.button("Start voice translation")
+add_transcrption_stop = st.sidebar.button("Stop voice translation")
 
 # -------------- Translate speech ---------------
 
@@ -76,6 +67,7 @@ def translate_speech(flow_id, message, language_to_speak):
 
     flow_runner = FlowRunner(flow_id=flow_id, api_key=api_key, tweaks=tweaks)
     response_json = flow_runner.run_flow(message=message)
+    print(f"Response JSON: {response_json}")
     result = flow_runner.extract_output_message(response_json)
     return result
 
@@ -87,10 +79,9 @@ def transcribe_audio(transcriber, language_to_speak, start):
             latest_transcription = transcriber.get_transcription()
             if latest_transcription:
                 chat_message_write("user", latest_transcription)
-                chat_message_write(
-                    "assistant", 
-                    translate_speech(FLOW_ID, latest_transcription, language_to_speak)
-                )
+                translation = translate_speech(FLOW_ID, latest_transcription, language_to_speak)
+                chat_message_write("assistant", translation)
+                elevenlabs_component(text=translation)
     else:
         transcriber.stop()
 
@@ -112,6 +103,7 @@ if prompt := st.chat_input(st.session_state.messages[0]['content']):
     chat_message_write("user", prompt)
     response = translate_speech(FLOW_ID, prompt, st.session_state.language)
     chat_message_write("assistant", response)
+    elevenlabs_component(text=response)
 
 if add_transcrption_start:
     st.session_state.transcriber = TranscribeAudio()
@@ -120,48 +112,4 @@ if add_transcrption_start:
 
 if add_transcrption_stop:
     transcribe_audio(st.session_state.transcriber, st.session_state.language, False)
-
-
-# Auto-refresh the Streamlit app every few seconds
-#st_autorefresh(interval=3000)  # Refresh every 3 seconds
-
-# Function to initialize and start the WebSocket server
-def init_websocket_server():
-    if 'websocket_server' not in st.session_state:
-        st.session_state.websocket_server = WebSocketServer(host="127.0.0.1", port=8000)
-        st.session_state.server_thread = st.session_state.websocket_server.run_in_thread()
-
-# Initialize the WebSocket server
-init_websocket_server()
-
-def on_message(ws, message):
-    print(f"Received message: {message}")
-    # Display the data
-    st.session_state.websocket_text = message
-    #st.sidebar.text_area("Websocket response", st.session_state.websocket_text)
-
-def on_error(ws, error):
-    print(f"Error: {error}")
-
-def on_close(ws, close_status_code, close_msg):
-    print("WebSocket closed")
-
-def on_open(ws):
-    print("WebSocket connection opened")
-    ws.send("Hello from client!")
-
-def run_websocket_client():
-    websocket_url = "ws://localhost:8000/ws"
-    ws = websocket.WebSocketApp(
-        websocket_url,
-        on_message=on_message,
-        on_error=on_error,
-        on_close=on_close
-    )
-    ws.on_open = on_open
-    ws.run_forever()
-
-if __name__ == "__main__":
-    run_websocket_client()
-
 

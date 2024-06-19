@@ -160,3 +160,45 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Ignore node_modules directory
+node_modules/
+
+# Ignore logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore build output directories and files
+dist/
+build/
+
+# Ignore TypeScript cache
+*.tsbuildinfo
+
+# Ignore compiled JavaScript files
+*.js
+*.js.map
+
+# Ignore specific TypeScript build output
+out/
+output/
+coverage/
+*.d.ts
+*.d.ts.map
+
+# Ignore WebStorm / IntelliJ IDEA project files
+.idea/
+
+# Ignore VSCode settings
+.vscode/
+.history/
+
+# Ignore npm package lock files
+package-lock.json
+yarn.lock
+
+# Ignore webpack cache
+.cache/
