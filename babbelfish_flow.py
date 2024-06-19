@@ -46,6 +46,7 @@ class FlowRunner:
         :return: The JSON response from the flow.
         """
         api_url = f"{self.BASE_API_URL}/{self.flow_id}"
+        print(f"API URL: {api_url}")
 
         payload = {
             "input_value": message,

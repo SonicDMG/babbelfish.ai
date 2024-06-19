@@ -9,8 +9,8 @@ declare global {
     }
 }
 
-const XI_API_KEY = "52cd5996ea8b5110695cac30d0db85d1";
-const VOICE_ID = "spPbymoy3hffKOFaqQsq";
+const XI_API_KEY = process.env.XI_API_KEY;
+const VOICE_ID = process.env.VOICE_ID;
 
 if (!XI_API_KEY) {
     throw new Error("Missing XI_API_KEY in environment variables");

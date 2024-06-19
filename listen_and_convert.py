@@ -1,9 +1,9 @@
+from collections import deque
+import threading
+import sys
 import sounddevice as sd
 import speech_recognition as sr
-import threading
 import webrtcvad
-import sys
-from collections import deque
 
 class TranscribeAudio:
     """
