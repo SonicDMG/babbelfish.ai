@@ -9,10 +9,13 @@ from elevenlabs_component import elevenlabs_component
 load_dotenv()
 
 FLOW_ID = os.getenv('FLOW_ID')
+VOICE_ID = os.getenv('VOICE_ID')
+MODEL_ID = os.getenv('MODEL_ID')
+#MODEL_ID = "eleven_turbo_v2"
 
 # -------------- Streamlit app config ---------------
 
-st.set_page_config(page_title="Babbelfish.ai", page_icon="🐠")
+st.set_page_config(page_title="Babbelfish.ai", page_icon="🐠", layout="wide")
 
 # -------------- Define session variables ---------------
 
@@ -27,18 +30,28 @@ if "messages" not in st.session_state:
 if "transcriber" not in st.session_state:
     st.session_state.transcriber = None
 
+# Initialize session state variables
+if "recording" not in st.session_state:
+    st.session_state.recording = False
+
 # -------------- Define Layout ---------------
 
-st.header(f"This page has run {st.session_state.counter} times.")
-st.title("Babbelfish.ai 💬🐠💬")
-st.caption("🚀 A Streamlit translation chatbot powered by Langflow")
+# Sidebar with fish logo, language input, and buttons
+with st.sidebar:
+    st.image("./static/fish_ear.webp", use_column_width=True)
+    st.text_input("Language to translate to", key="language")
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    with col1:
+        add_transcription_start = st.button("Start voice translation")
+    with col2:
+        add_transcription_stop = st.button("Stop voice translation")
 
-st.image("./static/fish_ear.webp")
-
-st.sidebar.button("Run it again")
-st.sidebar.text_input("Language to translate to", key="language")
-add_transcrption_start = st.sidebar.button("Start voice translation")
-add_transcrption_stop = st.sidebar.button("Stop voice translation")
+# Main section
+with st.container():
+    st.header(f"This page has run {st.session_state.counter} times.")
+    st.title("Babbelfish.ai 💬🐠💬")
+    st.caption("🚀 A Streamlit translation chatbot powered by Langflow")
 
 # -------------- Translate speech ---------------
 
@@ -51,15 +64,19 @@ def translate_speech(flow_id, message, language_to_speak):
     :param language_to_speak: The language to translate the message into
     """
     tweaks = {
-        "Prompt-y2nny": {},
-        "OpenAIModel-l5fMw": {},
-        "ChatOutput-qXbZT": {},
-        "ChatInput-wvbiq": {
+        "Prompt-sXFMH": {},
+        "GroqModel-eEwav": {
+            "stream": True
+        },
+        "ChatOutput-ZggnW": {},
+        "ChatInput-V3zKC": {
             "input_value": f"{message}"
         },
         "TextInput-zSj9q": {
             "input_value": f"{language_to_speak}"
-        }
+        },
+        "TextOutput-rRoEL": {},
+        "Prompt-Fa0Cf": {}
     }
 
     api_key = None  # Replace with your API key if needed
@@ -80,10 +97,9 @@ def transcribe_audio(transcriber, language_to_speak, start):
                 chat_message_write("user", latest_transcription)
                 translation = translate_speech(FLOW_ID, latest_transcription, language_to_speak)
                 chat_message_write("assistant", translation)
-                elevenlabs_component(text=translation)
+                elevenlabs_component(text=translation, voice_id=VOICE_ID, model_id=MODEL_ID)
     else:
         transcriber.stop()
-
 
 def chat_message_write(role, content):
     """
@@ -95,20 +111,22 @@ def chat_message_write(role, content):
     st.session_state.messages.append({"role": role, "content": content})
     st.chat_message(role).write(content)
 
-
 # -------------- Start the chat ---------------
+
+# Chat input at the bottom
 if prompt := st.chat_input(st.session_state.messages[0]['content']):
     print("prompt is True")
     chat_message_write("user", prompt)
     response = translate_speech(FLOW_ID, prompt, st.session_state.language)
     chat_message_write("assistant", response)
-    elevenlabs_component(text=response)
+    elevenlabs_component(text=response, voice_id=VOICE_ID, model_id=MODEL_ID)
 
-if add_transcrption_start:
+if add_transcription_start:
     st.session_state.transcriber = TranscribeAudio()
     print("Transcriber is instantiated")
+    st.session_state.recording = True
     transcribe_audio(st.session_state.transcriber, st.session_state.language, True)
 
-if add_transcrption_stop:
+if add_transcription_stop:
+    st.session_state.recording = False
     transcribe_audio(st.session_state.transcriber, st.session_state.language, False)
-

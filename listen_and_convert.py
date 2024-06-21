@@ -1,9 +1,11 @@
 from collections import deque
 import threading
 import sys
+import queue
 import sounddevice as sd
 import speech_recognition as sr
 import webrtcvad
+import numpy as np
 
 class TranscribeAudio:
     """
@@ -42,7 +44,7 @@ class TranscribeAudio:
         stop():
             Stops the recording loop.
     """
-    def __init__(self, samplerate=16000, frame_duration=30):
+    def __init__(self, samplerate=16000, frame_duration=30, audio_queue=None):
         self.samplerate = samplerate
         self.frame_duration = frame_duration
         self.frame_size = int(samplerate * frame_duration / 1000)
@@ -54,6 +56,7 @@ class TranscribeAudio:
         self.vad.set_mode(1)  # 0: least aggressive, 3: most aggressive
         self.audio_buffer = deque()  # Using deque for efficient appends and pops
         self.ellipses_printed = 0
+        self.audio_queue = audio_queue or queue.Queue()
 
     def recognize_speech_from_mic(self, audio_data):
         """
@@ -112,6 +115,11 @@ class TranscribeAudio:
             sys.stdout.flush()
             self.ellipses_printed += 1
             self.audio_buffer.append(audio_chunk)
+
+            # Compute the volume level and put it in the queue
+            volume_norm = np.linalg.norm(indata) * 10
+            self.audio_queue.put(volume_norm)
+
         elif self.audio_buffer:
             if self.ellipses_printed > 0:
                 print()  # Print a newline after ellipses

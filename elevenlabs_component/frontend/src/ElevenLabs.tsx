@@ -10,7 +10,6 @@ declare global {
 }
 
 const XI_API_KEY = process.env.XI_API_KEY;
-const VOICE_ID = process.env.VOICE_ID;
 
 if (!XI_API_KEY) {
     throw new Error("Missing XI_API_KEY in environment variables");
@@ -21,12 +20,13 @@ const client = new ElevenLabsClient({
 });
 
 export const createAudioStreamFromText = async (
-    text: string
+    text: string,
+    voice_id: string,
+    model_id: string,
 ): Promise<Buffer> => {
-    console.log("text input from EL component", text);
     const audioStream = await client.generate({
-        voice: VOICE_ID,
-        model_id: "eleven_multilingual_v2",
+        voice: voice_id,
+        model_id: model_id,
         text,
     });
 
@@ -62,12 +62,13 @@ const playAudio = async (audioBuffer: Buffer) => {
 const ElevenLabs: React.FC<ComponentProps> = ({ args }) => {
     useEffect(() => {
         const fetchAndPlayAudio = async () => {
-            const audioBuffer = await createAudioStreamFromText(args.text);
+            console.log("Text inputs from EL component args", args);
+            const audioBuffer = await createAudioStreamFromText(args.text, args.voice_id, args.model_id);
             playAudio(audioBuffer);
         };
         
         fetchAndPlayAudio();
-    }, [args.text]);
+    }, [args.text, args.voice_id, args.model_id]);
 
     return (
         <div>

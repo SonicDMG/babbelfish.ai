@@ -26,11 +26,13 @@ class FlowRunner:
         self.flow_id = flow_id
         self.api_key = api_key
         self.tweaks = tweaks or {
-            "Prompt-y2nny": {},
-            "OpenAIModel-l5fMw": {},
-            "ChatOutput-qXbZT": {},
-            "ChatInput-KxmWA": {},
-            "TextInput-XprTX": {}
+            "Prompt-sXFMH": {},
+            "GroqModel-eEwav": {},
+            "TextInput-zSj9q": {},
+            "ChatOutput-ZggnW": {},
+            "ChatInput-V3zKC": {},
+            "TextOutput-rRoEL": {},
+            "Prompt-Fa0Cf": {}
         }
 
     def run_flow(self,
