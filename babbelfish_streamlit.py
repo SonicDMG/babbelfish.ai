@@ -11,7 +11,7 @@ load_dotenv()
 FLOW_ID = os.getenv('FLOW_ID')
 VOICE_ID = os.getenv('VOICE_ID')
 MODEL_ID = os.getenv('MODEL_ID')
-#MODEL_ID = "eleven_turbo_v2"
+LANGUAGE_TO_SPEAK = os.getenv('LANGUAGE_TO_SPEAK')
 
 # -------------- Streamlit app config ---------------
 
@@ -34,12 +34,31 @@ if "transcriber" not in st.session_state:
 if "recording" not in st.session_state:
     st.session_state.recording = False
 
+# Initialize session state variables for chat history and conversation history
+if "history" not in st.session_state:
+    st.session_state.history = []
+
 # -------------- Define Layout ---------------
 
 # Sidebar with fish logo, language input, and buttons
 with st.sidebar:
+    st.caption("🚀 A Streamlit translation chatbot powered by Langflow")
     st.image("./static/fish_ear.webp", use_column_width=True)
-    st.text_input("Language to translate to", key="language")
+
+    # List of options for the dropdown
+    language_options = ["English", "Brazilian Portuguese", "Finnish", "French", "Japanese", "Spanish", "Urdu", "Californian surfer", "Other"]
+
+    # Create a selectbox for language selection
+    selected_option = st.selectbox("Language to translate to", language_options)
+    
+    # Show text input if "Other" is selected
+    if selected_option == "Other":
+        st.session_state.language = st.text_input("Please specify the language")
+    else:
+        st.session_state.language = selected_option
+
+    st.text_input("Audio voice for speech (can be a name like 'Nicole' or a voice ID)", value=VOICE_ID, key="voice_id")
+    st.selectbox("ElevenLabs.io model (turbo is faster, but less accurate)", [MODEL_ID, "eleven_turbo_v2"], key="model_id")
     st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
@@ -47,11 +66,35 @@ with st.sidebar:
     with col2:
         add_transcription_stop = st.button("Stop voice translation")
 
-# Main section
-with st.container():
-    st.header(f"This page has run {st.session_state.counter} times.")
-    st.title("Babbelfish.ai 💬🐠💬")
-    st.caption("🚀 A Streamlit translation chatbot powered by Langflow")
+# Fixed title
+st.markdown('<div class="fixed-header"><h1>Babbelfish.ai 💬🐠💬</h1></div>', unsafe_allow_html=True)
+
+# Scrollable container for chat messages
+chat_placeholder = st.empty()  # Placeholder for chat messages
+
+def render_chat():
+    with chat_placeholder.container():
+        st.markdown('<div class="scrollable-container">', unsafe_allow_html=True)
+        for message in st.session_state.messages:
+            st.chat_message(message['role']).write(message['content'])
+        
+        # Inject JavaScript to scroll to the bottom of the chat container
+        st.markdown(
+            """
+            <script>
+            function scrollToBottom() {
+                const chatContainer = document.querySelector('.scrollable-container');
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+            scrollToBottom();
+            </script>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# Initial render of chat messages
+render_chat()
 
 # -------------- Translate speech ---------------
 
@@ -97,7 +140,7 @@ def transcribe_audio(transcriber, language_to_speak, start):
                 chat_message_write("user", latest_transcription)
                 translation = translate_speech(FLOW_ID, latest_transcription, language_to_speak)
                 chat_message_write("assistant", translation)
-                elevenlabs_component(text=translation, voice_id=VOICE_ID, model_id=MODEL_ID)
+                elevenlabs_component(text=translation, voice_id=st.session_state.voice_id, model_id=st.session_state.model_id)
     else:
         transcriber.stop()
 
@@ -109,17 +152,18 @@ def chat_message_write(role, content):
     :param content: The content of the message
     """
     st.session_state.messages.append({"role": role, "content": content})
-    st.chat_message(role).write(content)
+    render_chat()  # Re-render chat messages after adding a new message
 
 # -------------- Start the chat ---------------
 
 # Chat input at the bottom
-if prompt := st.chat_input(st.session_state.messages[0]['content']):
-    print("prompt is True")
-    chat_message_write("user", prompt)
-    response = translate_speech(FLOW_ID, prompt, st.session_state.language)
-    chat_message_write("assistant", response)
-    elevenlabs_component(text=response, voice_id=VOICE_ID, model_id=MODEL_ID)
+if prompt := st.chat_input("Type your message here..."):
+    if prompt:
+        print("prompt is True")
+        chat_message_write("user", prompt)
+        response = translate_speech(FLOW_ID, prompt, st.session_state.language)
+        chat_message_write("assistant", response)
+        elevenlabs_component(text=response, voice_id=st.session_state.voice_id, model_id=st.session_state.model_id)
 
 if add_transcription_start:
     st.session_state.transcriber = TranscribeAudio()
@@ -130,3 +174,8 @@ if add_transcription_start:
 if add_transcription_stop:
     st.session_state.recording = False
     transcribe_audio(st.session_state.transcriber, st.session_state.language, False)
+
+if not st.session_state.history:
+    initial_bot_message = "Hi there, I'm Babbelfish.ai, type something to translate into any language.\n"
+    st.session_state.history.append({"role": "assistant", "content": initial_bot_message})
+    chat_message_write("assistant", initial_bot_message)
