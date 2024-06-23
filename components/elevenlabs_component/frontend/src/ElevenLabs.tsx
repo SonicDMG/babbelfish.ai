@@ -62,7 +62,7 @@ const playAudio = async (audioBuffer: Buffer) => {
 const ElevenLabs: React.FC<ComponentProps> = ({ args }) => {
     useEffect(() => {
         const fetchAndPlayAudio = async () => {
-            console.log("Text inputs from EL component args", args);
+            //console.log("Text inputs from EL component args", args);
             const audioBuffer = await createAudioStreamFromText(args.text, args.voice_id, args.model_id);
             playAudio(audioBuffer);
         };

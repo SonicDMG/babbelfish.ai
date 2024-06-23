@@ -63,7 +63,7 @@ class AudioRecorder extends StreamlitComponentBase {
 
     private startRecording = async (): Promise<void> => {
         this.setState({ isRecording: true });
-        console.log("startRecording entered");
+        //console.log("startRecording entered");
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             this.initAudioContext(stream);
@@ -74,7 +74,7 @@ class AudioRecorder extends StreamlitComponentBase {
 
     private stopRecording = (): void => {
         this.setState({ isRecording: false, silentDuration: 0, voiceDetected: false });
-        console.log("stopRecording entered");
+        //console.log("stopRecording entered");
         if (this.audioContext && this.audioContext.state !== "closed") {
             this.audioContext.close();
         }
@@ -85,7 +85,7 @@ class AudioRecorder extends StreamlitComponentBase {
     }
 
     private onStop = async (recordedData: ReactMicStopEvent) => {
-        console.log("onStop entered");
+        //console.log("onStop entered");
         this.processAudio(recordedData.blob);
     };
 

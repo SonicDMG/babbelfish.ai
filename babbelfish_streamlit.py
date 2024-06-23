@@ -34,6 +34,12 @@ if "history" not in st.session_state:
 if "audio_data" not in st.session_state:
     st.session_state.audio_data = None
 
+if "detected_language" not in st.session_state:
+    st.session_state.detected_language = None
+
+if "sentiment" not in st.session_state:
+    st.session_state.sentiment = None
+
 # -------------- Define Layout ---------------
 with st.sidebar:
     st.caption("🚀 A Streamlit translation chatbot powered by Langflow")
@@ -49,6 +55,15 @@ with st.sidebar:
 
     st.text_input("Audio voice for speech (can be a name like 'Nicole' or a voice ID)", value=VOICE_ID, key="voice_id")
     st.selectbox("ElevenLabs.io model (turbo is faster, but less accurate)", [MODEL_ID, "eleven_turbo_v2"], key="model_id")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("### Detected Language")
+        add_detected_langauge = st.text(st.session_state.detected_language if st.session_state.detected_language else "Not detected yet")
+    with col2:
+        st.markdown("### Sentiment")
+        add_sentiment = st.text(st.session_state.sentiment if st.session_state.sentiment else "Not detected yet")
+    
     st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
@@ -71,7 +86,6 @@ st.markdown('<div class="fixed-header"><h1>Babbelfish.ai 💬🐠💬</h1></div>
 
 # Scrollable container for chat messages
 chat_placeholder = st.empty()
-
 
 # -------------- Render chat messages ---------------
 def render_chat():
@@ -97,7 +111,6 @@ def render_chat():
 # Initial render of chat messages
 render_chat()
 
-
 # -------------- Translate speech ---------------
 def translate_speech(flow_id, message, language_to_speak):
     tweaks = {
@@ -113,7 +126,12 @@ def translate_speech(flow_id, message, language_to_speak):
             "input_value": f"{language_to_speak}"
         },
         "TextOutput-rRoEL": {},
-        "Prompt-Fa0Cf": {}
+        "Prompt-Fa0Cf": {},
+        "OpenAIModel-lDBVs": {
+            "stream": True
+        },
+        "Prompt-zX3NP": {},
+        "TextOutput-mg3fX": {},
     }
 
     api_key = None
@@ -121,8 +139,11 @@ def translate_speech(flow_id, message, language_to_speak):
     flow_runner = FlowRunner(flow_id=flow_id, api_key=api_key, tweaks=tweaks)
     response_json = flow_runner.run_flow(message=message)
     print(f"Response JSON: {response_json}")
-    result = flow_runner.extract_output_message(response_json)
-    return result
+    results = flow_runner.extract_output_message(response_json)
+    result1 = results.get('result1', 'No result1 found')
+    st.session_state.detected_language = results.get('result2', 'No result2 found')
+    st.session_state.sentiment = results.get('result3', 'No result3 found')
+    return result1
 
 
 def chat_message_write(role, content):
@@ -137,6 +158,9 @@ def chat_and_speak(in_message):
     response = translate_speech(FLOW_ID, in_message, st.session_state.language)
     chat_message_write("assistant", response)
     elevenlabs_component(text=response, voice_id=st.session_state.voice_id, model_id=st.session_state.model_id)
+
+    add_detected_langauge.text(st.session_state.detected_language)
+    add_sentiment.text(st.session_state.sentiment)
 
 
 # -------------- Call transcribe_audio based on updated state ---------------

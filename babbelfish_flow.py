@@ -32,7 +32,10 @@ class FlowRunner:
             "ChatOutput-ZggnW": {},
             "ChatInput-V3zKC": {},
             "TextOutput-rRoEL": {},
-            "Prompt-Fa0Cf": {}
+            "Prompt-Fa0Cf": {},
+            "OpenAIModel-lDBVs": {},
+            "Prompt-zX3NP": {},
+            "TextOutput-mg3fX": {},
         }
 
     def run_flow(self,
@@ -65,22 +68,41 @@ class FlowRunner:
         response.raise_for_status()  # Raise an HTTPError for bad responses
         return response.json()
 
-    def extract_output_message(self, response_json: Dict[str, Any]) -> str:
+    def extract_output_message(self, response_json: Dict[str, Any]) -> Dict[str, str]:
         """
-        Extract the output message from the flow response JSON.
+        Extract the output messages from the flow response JSON and combine them into a single results object.
 
         :param response_json: The JSON response from the flow.
-        :return: The output message.
+        :return: A dictionary containing the extracted results.
         """
         outputs = response_json.get('outputs', 'No output message found')
         if outputs == 'No output message found':
-            return outputs
+            return {'error': outputs}
 
         # Extract the first nested output
         first_output = outputs[0].get('outputs', [])
         if not first_output:
-            return 'No nested output found'
+            return {'error': 'No nested output found'}
 
         # Extract the result from the first nested output
-        results = first_output[0].get('results', {}).get('result', 'No result found')
+        result1 = first_output[0].get('results', {}).get('result', 'No result found')
+
+        # Extract the result from the second nested output
+        if len(first_output) > 1:
+            result2 = first_output[1].get('results', {}).get('result', 'No result found')
+        else:
+            result2 = 'Second nested output not found'
+
+        # Extract the result from the third nested output
+        if len(first_output) > 2:
+            result3 = first_output[2].get('results', {}).get('result', 'No result found')
+        else:
+            result3 = 'Third nested output not found'
+
+        results = {
+            'result1': result1,
+            'result2': result2,
+            'result3': result3
+        }
         return results
+
