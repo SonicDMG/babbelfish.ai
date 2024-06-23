@@ -1,11 +1,8 @@
 from collections import deque
 import threading
-import sys
 import queue
-import sounddevice as sd
 import speech_recognition as sr
 import webrtcvad
-import numpy as np
 
 class TranscribeAudio:
     """
@@ -58,18 +55,19 @@ class TranscribeAudio:
         self.ellipses_printed = 0
         self.audio_queue = audio_queue or queue.Queue()
 
-    def recognize_speech_from_mic(self, audio_data):
+
+    def recognize_speech_from_mic_as_bytes(self, audio_data):
         """
         Transcribe speech from recorded audio data.
 
         :param audio_data: The recorded audio data.
         :return: A dictionary with three keys:
-                 "success": a boolean indicating whether the API request was successful,
-                 "error":   `None` if no error occurred, otherwise a string containing
+                "success": a boolean indicating whether the API request was successful,
+                "error":   `None` if no error occurred, otherwise a string containing
                             an error message if the API could not be reached or
                             speech was unrecognizable,
-                 "transcription": `None` if speech could not be transcribed,
-                                  otherwise a string containing the transcribed text.
+                "transcription": `None` if speech could not be transcribed,
+                                otherwise a string containing the transcribed text.
         """
         response = {
             "success": True,
@@ -78,7 +76,18 @@ class TranscribeAudio:
         }
 
         try:
-            response["transcription"] = self.recognizer.recognize_google(audio_data)
+            # Create an AudioData object from the bytes
+            audio = sr.AudioData(audio_data, 16000, 2)  # Ensure the sample rate and sample width match your audio data
+
+            # Recognize the speech
+            transcription = self.recognizer.recognize_google(audio)
+            print("transcription from transcriber: ", transcription)
+            response["transcription"] = transcription
+
+            if transcription:
+                with self.condition:
+                    self.transcription = transcription
+                    self.condition.notify()
         except sr.RequestError:
             response["success"] = False
             response["error"] = "API unavailable"
@@ -87,54 +96,6 @@ class TranscribeAudio:
 
         return response
 
-    def record_and_recognize(self):
-        """
-        Record audio from the microphone and transcribe it.
-        Continuously listens and processes audio in real-time.
-        """
-        with sd.InputStream(samplerate=self.samplerate, channels=1, dtype='int16',
-                            blocksize=self.frame_size, callback=self.audio_callback):
-            self.is_running = True
-            while self.is_running:
-                pass  # The actual processing is handled in the callback
-
-    def audio_callback(self, indata, frames, time, status):
-        """
-        Callback function to process audio chunks in real-time.
-        """
-        if status:
-            print(f"Status: {status}")
-        if not self.is_running:
-            return
-
-        audio_chunk = indata[:, 0].tobytes()
-        is_speech = self.vad.is_speech(audio_chunk, self.samplerate)
-
-        if is_speech:
-            sys.stdout.write('.')
-            sys.stdout.flush()
-            self.ellipses_printed += 1
-            self.audio_buffer.append(audio_chunk)
-
-            # Compute the volume level and put it in the queue
-            volume_norm = np.linalg.norm(indata) * 10
-            self.audio_queue.put(volume_norm)
-
-        elif self.audio_buffer:
-            if self.ellipses_printed > 0:
-                print()  # Print a newline after ellipses
-                self.ellipses_printed = 0
-            # If speech ended, process the accumulated audio buffer
-            audio_data = b''.join(self.audio_buffer)
-            self.audio_buffer = []
-
-            audio_data = sr.AudioData(audio_data, self.samplerate, 2)
-            transcription = self.process_audio(audio_data)
-
-            if transcription:
-                with self.condition:
-                    self.transcription = transcription
-                    self.condition.notify()
 
     def process_audio(self, audio_data):
         """
@@ -143,7 +104,9 @@ class TranscribeAudio:
         :param audio_data: The recorded audio data.
         :return: The transcribed text.
         """
-        result = self.recognize_speech_from_mic(audio_data)
+
+        print("audio_data from transcriber")
+        result = self.recognize_speech_from_mic_as_bytes(audio_data)
         if result["success"]:
             if result["transcription"]:
                 return result["transcription"]
@@ -151,14 +114,16 @@ class TranscribeAudio:
             print("ERROR: {}\n".format(result["error"]))
         return None
 
+
     def start(self):
         """
         Starts the recording and recognition process in a separate thread.
         """
         print("Starting transcription from class...")
         self.is_running = True
-        self.thread = threading.Thread(target=self.record_and_recognize)
-        self.thread.start()
+        #self.thread = threading.Thread(target=self.record_and_recognize)
+        #self.thread.start()
+
 
     def get_transcription(self):
         """
@@ -168,10 +133,11 @@ class TranscribeAudio:
             self.condition.wait()
             return self.transcription
 
+
     def stop(self):
         """
         Stops the recording loop.
         """
         print("Stoppping transcription from class...")
         self.is_running = False
-        self.thread.join()
+        #self.thread.join()
