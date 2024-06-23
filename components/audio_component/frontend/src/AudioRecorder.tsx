@@ -29,8 +29,8 @@ class AudioRecorder extends StreamlitComponentBase {
     private audioContext?: AudioContext;
     private analyser?: AnalyserNode;
     private dataArray?: Uint8Array;
-    private silenceThreshold: number = 10; // Adjust the threshold as needed
-    private silenceTimeout: number = 0.3; // Seconds of silence to detect
+    private silenceThreshold: number = 5; // Adjust the threshold as needed
+    private silenceTimeout: number = 0.5; // Seconds of silence to detect
     private minVoiceFrequency: number = 300; // Minimum frequency for human voice in Hz
     private maxVoiceFrequency: number = 3400; // Maximum frequency for human voice in Hz
     private currentRecordedData?: Blob;

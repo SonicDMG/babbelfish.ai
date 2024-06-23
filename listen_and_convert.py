@@ -72,7 +72,7 @@ class TranscribeAudio:
         print(f"Calculated RMS: {rms}")  # Debug output for RMS
         return rms
 
-    def is_speech_present(self, audio_data, noise_threshold=20):
+    def is_speech_present(self, audio_data, noise_threshold=5):
         """
         Determine if the audio contains speech or just noise.
         """

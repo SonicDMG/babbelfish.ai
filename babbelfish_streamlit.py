@@ -138,7 +138,7 @@ def translate_speech(flow_id, message, language_to_speak):
 
     flow_runner = FlowRunner(flow_id=flow_id, api_key=api_key, tweaks=tweaks)
     response_json = flow_runner.run_flow(message=message)
-    print(f"Response JSON: {response_json}")
+    #print(f"Response JSON: {response_json}")
     results = flow_runner.extract_output_message(response_json)
     result1 = results.get('result1', 'No result1 found')
     st.session_state.detected_language = results.get('result2', 'No result2 found')
@@ -177,7 +177,7 @@ transcribe_audio(st.session_state.transcriber, st.session_state.language, st.ses
 # Process audio if transcriber and audio data are available
 if st.session_state.transcriber is not None and st.session_state.audio_data is not None:
     message = st.session_state.transcriber.process_audio(st.session_state.audio_data)
-    if message:
+    if message is not None:
         chat_and_speak(message)
 
 
