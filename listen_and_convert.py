@@ -1,6 +1,7 @@
 from collections import deque
 import threading
 import queue
+import numpy as np
 import speech_recognition as sr
 import webrtcvad
 
@@ -56,6 +57,31 @@ class TranscribeAudio:
         self.audio_queue = audio_queue or queue.Queue()
 
 
+    def audio_to_numpy(self, audio_data):
+        """
+        Convert an audio_data bytes object to a numpy array.
+        """
+        audio_array = np.frombuffer(audio_data, np.int16)
+        return audio_array
+
+    def calculate_rms(self, audio_array):
+        """
+        Calculate the Root Mean Square (RMS) of the audio signal.
+        """
+        rms = np.sqrt(np.mean(audio_array**2))
+        print(f"Calculated RMS: {rms}")  # Debug output for RMS
+        return rms
+
+    def is_speech_present(self, audio_data, noise_threshold=20):
+        """
+        Determine if the audio contains speech or just noise.
+        """
+        audio_array = self.audio_to_numpy(audio_data)
+        rms = self.calculate_rms(audio_array)
+        print(f"RMS Energy: {rms}, Threshold: {noise_threshold}")  # Debug output for RMS and threshold
+        return rms > noise_threshold
+    
+
     def recognize_speech_from_mic_as_bytes(self, audio_data):
         """
         Transcribe speech from recorded audio data.
@@ -81,10 +107,9 @@ class TranscribeAudio:
 
             # Recognize the speech
             transcription = self.recognizer.recognize_google(audio)
-            print("transcription from transcriber: ", transcription)
-            response["transcription"] = transcription
+            if transcription and transcription is not "":
+                response["transcription"] = transcription
 
-            if transcription:
                 with self.condition:
                     self.transcription = transcription
                     self.condition.notify()
@@ -105,13 +130,18 @@ class TranscribeAudio:
         :return: The transcribed text.
         """
 
-        print("audio_data from transcriber")
-        result = self.recognize_speech_from_mic_as_bytes(audio_data)
-        if result["success"]:
-            if result["transcription"]:
-                return result["transcription"]
+        if self.is_speech_present(audio_data):
+            print("audio_data from transcriber")
+            result = self.recognize_speech_from_mic_as_bytes(audio_data)
+            if result["success"]:
+                if result["transcription"]:
+                     # Clear the audio buffer after a successful transcription
+                    self.audio_buffer.clear()
+                    return result["transcription"]
+            else:
+                print("ERROR: {}\n".format(result["error"]))
         else:
-            print("ERROR: {}\n".format(result["error"]))
+            print("No meaningful speech detected, just noise")
         return None
 
 
@@ -121,8 +151,6 @@ class TranscribeAudio:
         """
         print("Starting transcription from class...")
         self.is_running = True
-        #self.thread = threading.Thread(target=self.record_and_recognize)
-        #self.thread.start()
 
 
     def get_transcription(self):
@@ -131,7 +159,9 @@ class TranscribeAudio:
         """
         with self.condition:
             self.condition.wait()
-            return self.transcription
+            transcription = self.transcription
+            self.transcription = None
+            return transcription
 
 
     def stop(self):
@@ -140,4 +170,3 @@ class TranscribeAudio:
         """
         print("Stoppping transcription from class...")
         self.is_running = False
-        #self.thread.join()

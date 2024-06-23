@@ -30,7 +30,7 @@ class AudioRecorder extends StreamlitComponentBase {
     private analyser?: AnalyserNode;
     private dataArray?: Uint8Array;
     private silenceThreshold: number = 10; // Adjust the threshold as needed
-    private silenceTimeout: number = 0.5; // Seconds of silence to detect
+    private silenceTimeout: number = 0.3; // Seconds of silence to detect
     private minVoiceFrequency: number = 300; // Minimum frequency for human voice in Hz
     private maxVoiceFrequency: number = 3400; // Maximum frequency for human voice in Hz
     private currentRecordedData?: Blob;
@@ -95,7 +95,6 @@ class AudioRecorder extends StreamlitComponentBase {
             const audioContext = new AudioContext({ sampleRate: 16000 });
 
             const arrayBuffer = await recordedBlob.arrayBuffer();
-
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
             const offlineAudioContext = new OfflineAudioContext(audioBuffer.numberOfChannels, audioBuffer.length, 16000);
@@ -140,7 +139,6 @@ class AudioRecorder extends StreamlitComponentBase {
         this.analyser.getByteTimeDomainData(this.dataArray);
 
         const volume = this.getVolume();
-        //console.log('Volume:', volume);
 
         if (volume < this.silenceThreshold) {
             this.setState({ silentDuration: this.state.silentDuration + 1 });
@@ -148,12 +146,9 @@ class AudioRecorder extends StreamlitComponentBase {
             this.setState({ silentDuration: 0, voiceDetected: true });
         }
 
-        //console.log('SilentDuration:', this.state.silentDuration);
-
         if (this.state.voiceDetected && this.state.silentDuration >= this.silenceTimeout * (this.audioContext?.sampleRate ?? 44100) / this.analyser.fftSize) {
             if (this.currentRecordedData) {
                 this.stopRecording();
-                //this.processAudio(this.currentRecordedData);
                 this.currentRecordedData = undefined;
                 this.setState({ voiceDetected: false });
                 this.startRecording();

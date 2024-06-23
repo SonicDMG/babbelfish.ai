@@ -133,10 +133,10 @@ def chat_message_write(role, content):
 
 # -------------- Call chat_and_speak based on input message ---------------
 def chat_and_speak(in_message):
-        chat_message_write("user", in_message)
-        response = translate_speech(FLOW_ID, in_message, st.session_state.language)
-        chat_message_write("assistant", response)
-        elevenlabs_component(text=response, voice_id=st.session_state.voice_id, model_id=st.session_state.model_id)
+    chat_message_write("user", in_message)
+    response = translate_speech(FLOW_ID, in_message, st.session_state.language)
+    chat_message_write("assistant", response)
+    elevenlabs_component(text=response, voice_id=st.session_state.voice_id, model_id=st.session_state.model_id)
 
 
 # -------------- Call transcribe_audio based on updated state ---------------
