@@ -53,6 +53,8 @@ with st.sidebar:
     else:
         st.session_state.language = selected_option
 
+    voice_checkbox = st.checkbox("Enable voice translation", value=True)
+
     st.text_input("Audio voice for speech (can be a name like 'Nicole' or a voice ID)", value=VOICE_ID, key="voice_id")
     st.selectbox("ElevenLabs.io model (turbo is faster, but less accurate)", [MODEL_ID, "eleven_turbo_v2"], key="model_id")
     
@@ -157,7 +159,8 @@ def chat_and_speak(in_message):
     chat_message_write("user", in_message)
     response = translate_speech(FLOW_ID, in_message, st.session_state.language)
     chat_message_write("assistant", response)
-    elevenlabs_component(text=response, voice_id=st.session_state.voice_id, model_id=st.session_state.model_id)
+    if voice_checkbox:
+        elevenlabs_component(text=response, voice_id=st.session_state.voice_id, model_id=st.session_state.model_id)
 
     add_detected_langauge.text(st.session_state.detected_language)
     add_sentiment.text(st.session_state.sentiment)
@@ -172,7 +175,8 @@ def transcribe_audio(transcriber, language, is_recording):
         transcriber.stop()
         print("Transcription stopped")
 
-transcribe_audio(st.session_state.transcriber, st.session_state.language, st.session_state.is_recording)
+if voice_checkbox:
+    transcribe_audio(st.session_state.transcriber, st.session_state.language, st.session_state.is_recording)
 
 # Process audio if transcriber and audio data are available
 if st.session_state.transcriber is not None and st.session_state.audio_data is not None:
