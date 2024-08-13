@@ -1,14 +1,19 @@
+"""A class to handle real-time audio transcription using the Google Web Speech API."""
 from collections import deque
 import threading
 import queue
+import logging
 import numpy as np
 import speech_recognition as sr
 import webrtcvad
+import coloredlogs
+
+# Configure logging
+logger = logging.getLogger(__name__)
+coloredlogs.install(level='INFO', logger=logger, fmt='%(levelname)s %(message)s')
 
 class TranscribeAudio:
     """
-    A class to handle real-time audio transcription using the Google Web Speech API.
-
     This class records audio from the microphone in chunks, processes the audio data, and 
     transcribes it using the Google Web Speech API. It operates in real-time, continuously 
     listening and transcribing audio until stopped.
@@ -51,11 +56,9 @@ class TranscribeAudio:
         self.transcription = None
         self.condition = threading.Condition()
         self.vad = webrtcvad.Vad()
-        self.vad.set_mode(1)  # 0: least aggressive, 3: most aggressive
+        self.vad.set_mode(0)  # 0: least aggressive, 3: most aggressive
         self.audio_buffer = deque()  # Using deque for efficient appends and pops
-        self.ellipses_printed = 0
         self.audio_queue = audio_queue or queue.Queue()
-
 
     def audio_to_numpy(self, audio_data):
         """
@@ -69,18 +72,17 @@ class TranscribeAudio:
         Calculate the Root Mean Square (RMS) of the audio signal.
         """
         rms = np.sqrt(np.mean(audio_array**2))
-        print(f"Calculated RMS: {rms}")  # Debug output for RMS
+        logger.info("Calculated RMS: %s", rms)  # Debug output for RMS
         return rms
 
-    def is_speech_present(self, audio_data, noise_threshold=5):
+    def is_speech_present(self, audio_data, noise_threshold=10):
         """
         Determine if the audio contains speech or just noise.
         """
         audio_array = self.audio_to_numpy(audio_data)
         rms = self.calculate_rms(audio_array)
-        print(f"RMS Energy: {rms}, Threshold: {noise_threshold}")  # Debug output for RMS and threshold
+        logger.info("RMS Energy: %s, Threshold: %s", rms, noise_threshold)  # Debug output for RMS and threshold
         return rms > noise_threshold
-    
 
     def recognize_speech_from_mic_as_bytes(self, audio_data):
         """
@@ -107,7 +109,7 @@ class TranscribeAudio:
 
             # Recognize the speech
             transcription = self.recognizer.recognize_google(audio)
-            if transcription and transcription is not "":
+            if transcription and transcription != "":
                 response["transcription"] = transcription
 
                 with self.condition:
@@ -121,7 +123,6 @@ class TranscribeAudio:
 
         return response
 
-
     def process_audio(self, audio_data):
         """
         Process the audio data and transcribe it.
@@ -129,29 +130,26 @@ class TranscribeAudio:
         :param audio_data: The recorded audio data.
         :return: The transcribed text.
         """
-
         if self.is_speech_present(audio_data):
-            print("audio_data from transcriber")
+            logger.info("audio_data from transcriber")
             result = self.recognize_speech_from_mic_as_bytes(audio_data)
             if result["success"]:
                 if result["transcription"]:
-                     # Clear the audio buffer after a successful transcription
+                    # Clear the audio buffer after a successful transcription
                     self.audio_buffer.clear()
                     return result["transcription"]
             else:
-                print("ERROR: {}\n".format(result["error"]))
+                logger.error("ERROR: %s", result['error'])
         else:
-            print("No meaningful speech detected, just noise")
+            logger.info("No meaningful speech detected, just noise")
         return None
-
 
     def start(self):
         """
         Starts the recording and recognition process in a separate thread.
         """
-        print("Starting transcription from class...")
+        logger.info("Starting transcription from class...")
         self.is_running = True
-
 
     def get_transcription(self):
         """
@@ -163,10 +161,9 @@ class TranscribeAudio:
             self.transcription = None
             return transcription
 
-
     def stop(self):
         """
         Stops the recording loop.
         """
-        print("Stoppping transcription from class...")
+        logger.info("Stopping transcription from class...")
         self.is_running = False

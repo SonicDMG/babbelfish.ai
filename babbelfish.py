@@ -1,10 +1,17 @@
+"""An application to translate any language to any other language using Langflow and Streamlit."""
 import os
+import logging
 import streamlit as st
 from dotenv import load_dotenv
-from babbelfish_flow import FlowRunner
+import coloredlogs
+from langflow_runner import LangflowRunner
 from listen_and_convert import TranscribeAudio
 from components.audio_component import audio_component
 from components.elevenlabs_component import elevenlabs_component
+
+# Configure logger
+logger = logging.getLogger("BabbelfishLogger")
+coloredlogs.install(level='DEBUG', logger=logger, fmt='%(levelname)s %(message)s')
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,36 +23,30 @@ LANGUAGE_TO_SPEAK = os.getenv('LANGUAGE_TO_SPEAK')
 
 # -------------- Streamlit app config ---------------
 st.set_page_config(page_title="Babbelfish.ai", page_icon="🐠", layout="wide")
-print("--- Streamlit start app ---\n\n")
+logger.info("--- Streamlit start app ---\n\n")
 
 # -------------- Initialize session state variables ---------------
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+session_vars = {
+    "messages": [],
+    "transcriber": TranscribeAudio(),
+    "is_recording": False,
+    "history": [],
+    "audio_data": None,
+    "detected_language": None,
+    "sentiment": None,
+    "explanation": None
+}
 
-if "transcriber" not in st.session_state:
-    st.session_state.transcriber = TranscribeAudio()
-
-if "is_recording" not in st.session_state:
-    st.session_state.is_recording = False
-
-if "history" not in st.session_state:
-    st.session_state.history = []
-
-if "audio_data" not in st.session_state:
-    st.session_state.audio_data = None
-
-if "detected_language" not in st.session_state:
-    st.session_state.detected_language = None
-
-if "sentiment" not in st.session_state:
-    st.session_state.sentiment = None
+for var, default in session_vars.items():
+    if var not in st.session_state:
+        st.session_state[var] = default
 
 # -------------- Define Layout ---------------
 with st.sidebar:
     st.caption("🚀 A Streamlit translation chatbot powered by Langflow")
     st.image("./static/fish_ear.webp", use_column_width=True)
 
-    language_options = ["English", "Brazilian Portuguese", "Finnish", "French", "Japanese", "Spanish", "Urdu", "Californian surfer", "Other"]
+    language_options = ["English", "Brazilian Portuguese", "French", "Japanese", "Spanish", "Urdu", "Other"]
     selected_option = st.selectbox("Language to translate to", language_options)
     
     if selected_option == "Other":
@@ -61,7 +62,7 @@ with st.sidebar:
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("### Detected Language")
-        add_detected_langauge = st.text(st.session_state.detected_language if st.session_state.detected_language else "Not detected yet")
+        add_detected_language = st.text(st.session_state.detected_language if st.session_state.detected_language else "Not detected yet")
     with col2:
         st.markdown("### Sentiment")
         add_sentiment = st.text(st.session_state.sentiment if st.session_state.sentiment else "Not detected yet")
@@ -80,7 +81,7 @@ with st.sidebar:
     if add_transcription_stop:
         st.session_state.is_recording = False
 
-    # -------------- Render the audio component ---------------
+    # Render the audio component
     st.session_state.audio_data = audio_component(is_recording=st.session_state.is_recording)
 
 # Fixed title
@@ -91,6 +92,7 @@ chat_placeholder = st.empty()
 
 # -------------- Render chat messages ---------------
 def render_chat():
+    """Render chat messages in a scrollable container."""
     with chat_placeholder.container():
         st.markdown('<div class="scrollable-container">', unsafe_allow_html=True)
         for message in st.session_state.messages:
@@ -114,76 +116,87 @@ def render_chat():
 render_chat()
 
 # -------------- Translate speech ---------------
-def translate_speech(flow_id, message, language_to_speak):
+def translate_speech(flow_id: str, message: str, language_to_speak: str) -> dict:
+    """
+    Translate the given message to the specified language using Langflow.
+
+    :param flow_id: The ID of the Langflow flow.
+    :param message: The message to translate.
+    :param language_to_speak: The language to translate the message to.
+    :return: A dictionary containing the translation and other metadata.
+    """
     tweaks = {
-        "Prompt-sXFMH": {},
-        "GroqModel-eEwav": {
-            "stream": True
-        },
-        "ChatOutput-ZggnW": {},
-        "ChatInput-V3zKC": {
-            "input_value": f"{message}"
-        },
-        "TextInput-zSj9q": {
+        "TextInput-JKRiD": {
             "input_value": f"{language_to_speak}"
-        },
-        "TextOutput-rRoEL": {},
-        "Prompt-Fa0Cf": {},
-        "OpenAIModel-lDBVs": {
-            "stream": True
-        },
-        "Prompt-zX3NP": {},
-        "TextOutput-mg3fX": {},
+        }
     }
 
     api_key = None
 
-    flow_runner = FlowRunner(flow_id=flow_id, api_key=api_key, tweaks=tweaks)
+    flow_runner = LangflowRunner(flow_id=flow_id, api_key=api_key, tweaks=tweaks)
     response_json = flow_runner.run_flow(message=message)
-    #print(f"Response JSON: {response_json}")
+    
     results = flow_runner.extract_output_message(response_json)
-    result1 = results.get('result1', 'No result1 found')
-    st.session_state.detected_language = results.get('result2', 'No result2 found')
-    st.session_state.sentiment = results.get('result3', 'No result3 found')
-    return result1
+    return results
 
+def chat_message_write(role: str, content: str):
+    """
+    Write a chat message to the session state and re-render the chat.
 
-def chat_message_write(role, content):
-    print(f"role: {role}, content: {content}")
+    :param role: The role of the message sender (e.g., "user" or "assistant").
+    :param content: The content of the message.
+    """
     st.session_state.messages.append({"role": role, "content": content})
     render_chat()  # Re-render chat messages after adding a new message
 
-
 # -------------- Call chat_and_speak based on input message ---------------
-def chat_and_speak(in_message):
-    chat_message_write("user", in_message)
-    response = translate_speech(FLOW_ID, in_message, st.session_state.language)
-    chat_message_write("assistant", response)
-    if voice_checkbox:
-        elevenlabs_component(text=response, voice_id=st.session_state.voice_id, model_id=st.session_state.model_id)
+def chat_and_speak(in_message: str):
+    """
+    Handle chat input, translate it, and update the session state.
 
-    add_detected_langauge.text(st.session_state.detected_language)
+    :param in_message: The input message from the user.
+    """
+    chat_message_write("user", in_message)
+    response = translate_speech(FLOW_ID or "", in_message, st.session_state.language)
+    translation = response.get('translation', 'No translation found')
+    st.session_state.detected_language = response.get('detected_language', 'No detected_language found')
+    st.session_state.sentiment = response.get('sentiment', 'No sentiment found')
+    st.session_state.explanation = response.get('explanation', 'No sentiment found')
+
+    chat_message_write("assistant", translation)
+    st.subheader("Note:")
+    st.write(st.session_state.explanation)
+    if voice_checkbox:
+        elevenlabs_component(text=translation, voice_id=st.session_state.voice_id, model_id=st.session_state.model_id)
+
+    add_detected_language.text(st.session_state.detected_language)
     add_sentiment.text(st.session_state.sentiment)
 
-
 # -------------- Call transcribe_audio based on updated state ---------------
-def transcribe_audio(transcriber, language, is_recording):
+def transcribe_audio(transcriber: TranscribeAudio, is_recording: bool, language: str = ""):
+    """
+    Start or stop the transcription process based on the recording state.
+
+    :param transcriber: The TranscribeAudio instance.
+    :param language: The language to transcribe.
+    :param is_recording: The recording state.
+    """
     if is_recording:
         transcriber.start()
-        print(f"Transcribing in {language}...")
+        logger.info("Transcribing in %s...", language)
     else:
         transcriber.stop()
-        print("Transcription stopped")
+        logger.info("Transcription stopped")
 
 if voice_checkbox:
-    transcribe_audio(st.session_state.transcriber, st.session_state.language, st.session_state.is_recording)
+    language = st.session_state.language or ""
+    transcribe_audio(st.session_state.transcriber, st.session_state.is_recording, language)
 
 # Process audio if transcriber and audio data are available
-if st.session_state.transcriber is not None and st.session_state.audio_data is not None:
-    message = st.session_state.transcriber.process_audio(st.session_state.audio_data)
-    if message is not None:
-        chat_and_speak(message)
-
+if st.session_state.transcriber and st.session_state.audio_data:
+    audio_message = st.session_state.transcriber.process_audio(st.session_state.audio_data)
+    if audio_message:
+        chat_and_speak(audio_message)
 
 # -------------- Start the chat ---------------
 if prompt := st.chat_input("Type your message here..."):
@@ -191,9 +204,9 @@ if prompt := st.chat_input("Type your message here..."):
         chat_and_speak(prompt)
 
 if not st.session_state.history:
-    initial_bot_message = """
+    INITIAL_BOT_MESSAGE = """
         Hi there, I'm Babbelfish.ai, 
         choose a language from the menu and type something to translate into any language.\n
     """
-    st.session_state.history.append({"role": "assistant", "content": initial_bot_message})
-    chat_message_write("assistant", initial_bot_message)
+    st.session_state.history.append({"role": "assistant", "content": INITIAL_BOT_MESSAGE})
+    chat_message_write("assistant", INITIAL_BOT_MESSAGE)
