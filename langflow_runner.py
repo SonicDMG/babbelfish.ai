@@ -61,12 +61,12 @@ class LangflowRunner:
         headers = {"x-api-key": self.api_key} if self.api_key else None
 
         try:
-            response = requests.post(api_url, json=payload, headers=headers, timeout=20)
-            response.raise_for_status()  # Raise an HTTPError for bad responses
+            response = requests.post(api_url, json=payload, headers=headers, timeout=30)
+            #response.raise_for_status()  # Raise an HTTPError for bad responses
             return response.json()
         except requests.RequestException as e:
             logger.error("Request failed: %s", e)
-            raise
+            #raise
 
     def extract_output_message(self, response_json: Dict[str, Any]) -> Dict[str, str]:
         """

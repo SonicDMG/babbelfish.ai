@@ -75,7 +75,7 @@ class TranscribeAudio:
         logger.info("Calculated RMS: %s", rms)  # Debug output for RMS
         return rms
 
-    def is_speech_present(self, audio_data, noise_threshold=10):
+    def is_speech_present(self, audio_data, noise_threshold=20):
         """
         Determine if the audio contains speech or just noise.
         """
@@ -84,7 +84,7 @@ class TranscribeAudio:
         logger.info("RMS Energy: %s, Threshold: %s", rms, noise_threshold)  # Debug output for RMS and threshold
         return rms > noise_threshold
 
-    def recognize_speech_from_mic_as_bytes(self, audio_data):
+    def recognize_speech_from_mic_as_bytes(self, audio_data, speaking_language):
         """
         Transcribe speech from recorded audio data.
 
@@ -108,7 +108,8 @@ class TranscribeAudio:
             audio = sr.AudioData(audio_data, 16000, 2)  # Ensure the sample rate and sample width match your audio data
 
             # Recognize the speech
-            transcription = self.recognizer.recognize_google(audio)
+            logger.info("speaking_language is %s", speaking_language)
+            transcription = self.recognizer.recognize_google(audio, language=speaking_language)
             if transcription and transcription != "":
                 response["transcription"] = transcription
 
@@ -123,7 +124,7 @@ class TranscribeAudio:
 
         return response
 
-    def process_audio(self, audio_data):
+    def process_audio(self, audio_data, speaking_language):
         """
         Process the audio data and transcribe it.
 
@@ -131,8 +132,9 @@ class TranscribeAudio:
         :return: The transcribed text.
         """
         if self.is_speech_present(audio_data):
-            logger.info("audio_data from transcriber")
-            result = self.recognize_speech_from_mic_as_bytes(audio_data)
+            logger.info("human speech detected from transcriber")
+            result = self.recognize_speech_from_mic_as_bytes(audio_data, speaking_language)
+            logger.info("result: %s", result)
             if result["success"]:
                 if result["transcription"]:
                     # Clear the audio buffer after a successful transcription

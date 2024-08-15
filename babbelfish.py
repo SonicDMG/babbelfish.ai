@@ -23,7 +23,7 @@ LANGUAGE_TO_SPEAK = os.getenv('LANGUAGE_TO_SPEAK')
 
 # -------------- Streamlit app config ---------------
 st.set_page_config(page_title="Babbelfish.ai", page_icon="🐠", layout="wide")
-logger.info("--- Streamlit start app ---\n\n")
+logger.info("\n\n--- Streamlit start app ---")
 
 # -------------- Initialize session state variables ---------------
 session_vars = {
@@ -46,13 +46,16 @@ with st.sidebar:
     st.caption("🚀 A Streamlit translation chatbot powered by Langflow")
     st.image("./static/fish_ear.webp", use_column_width=True)
 
-    language_options = ["English", "Brazilian Portuguese", "French", "Japanese", "Spanish", "Urdu", "Other"]
-    selected_option = st.selectbox("Language to translate to", language_options)
-    
-    if selected_option == "Other":
+    translate_language_options = ["English", "French", "Japanese", "Spanish", "Urdu", "Other"]
+    language_option = st.selectbox("Language to translate to", translate_language_options)
+    if language_option == "Other":
         st.session_state.language = st.text_input("Please specify the language")
     else:
-        st.session_state.language = selected_option
+        st.session_state.language = language_option
+
+    speaking_language_options = ["en-US", "fr-FR", "en-ES", "fil-PH", "Other"]
+    speaking_option = st.selectbox("Language I'm speaking in", speaking_language_options)
+    st.session_state.speaking_language = speaking_option
 
     voice_checkbox = st.checkbox("Enable voice translation", value=True)
 
@@ -194,8 +197,9 @@ if voice_checkbox:
 
 # Process audio if transcriber and audio data are available
 if st.session_state.transcriber and st.session_state.audio_data:
-    audio_message = st.session_state.transcriber.process_audio(st.session_state.audio_data)
+    audio_message = st.session_state.transcriber.process_audio(st.session_state.audio_data, st.session_state.speaking_language)
     if audio_message:
+        logger.info("Audio message: %s", audio_message)
         chat_and_speak(audio_message)
 
 # -------------- Start the chat ---------------

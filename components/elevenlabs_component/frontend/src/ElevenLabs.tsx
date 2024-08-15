@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { withStreamlitConnection, ComponentProps } from "streamlit-component-lib";
 import { ElevenLabsClient } from "elevenlabs";
-import { Buffer } from "buffer";  // Import Buffer
+import { Buffer } from "buffer";
 
 declare global {
     interface Window {

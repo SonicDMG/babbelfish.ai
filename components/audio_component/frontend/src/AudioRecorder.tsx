@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { withStreamlitConnection, StreamlitComponentBase, Streamlit } from "streamlit-component-lib";
 import { ReactMic } from 'react-mic';
-import './styles.css'; // Make sure to include this line to import your CSS
+import './styles.css';
 
 declare global {
     interface Window {
@@ -18,22 +18,29 @@ interface ReactMicStopEvent {
         mimeType: string;
     };
     blobURL: string;
-    size: number; // Add size property
-    type: string; // Add type property
-    arrayBuffer: () => Promise<ArrayBuffer>; // Add arrayBuffer method
-    slice: (start?: number, end?: number, contentType?: string) => Blob; // Add slice method
+    size: number;
+    type: string;
+    arrayBuffer: () => Promise<ArrayBuffer>;
+    slice: (start?: number, end?: number, contentType?: string) => Blob;
 }
 
-class AudioRecorder extends StreamlitComponentBase {
-    public state = { isRecording: false, silentDuration: 0, voiceDetected: false }
+interface AudioRecorderState {
+    isRecording: boolean;
+    silentDuration: number;
+    voiceDetected: boolean;
+}
+
+class AudioRecorder extends StreamlitComponentBase<{}, AudioRecorderState> {
+    public state: AudioRecorderState = { isRecording: false, silentDuration: 0, voiceDetected: false };
     private audioContext?: AudioContext;
     private analyser?: AnalyserNode;
     private dataArray?: Uint8Array;
-    private silenceThreshold: number = 5; // Adjust the threshold as needed
-    private silenceTimeout: number = 0.5; // Seconds of silence to detect
-    private minVoiceFrequency: number = 300; // Minimum frequency for human voice in Hz
-    private maxVoiceFrequency: number = 3400; // Maximum frequency for human voice in Hz
+    private silenceThreshold: number = 5;
+    private silenceTimeout: number = 0.1;
+    private minVoiceFrequency: number = 300;
+    private maxVoiceFrequency: number = 3400;
     private currentRecordedData?: Blob;
+    private noiseGateThreshold: number = -40; // in decibels
 
     constructor(props: any) {
         super(props);
@@ -61,9 +68,8 @@ class AudioRecorder extends StreamlitComponentBase {
         );
     };
 
-    private startRecording = async (): Promise<void> => {
+    private async startRecording(): Promise<void> {
         this.setState({ isRecording: true });
-        //console.log("startRecording entered");
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             this.initAudioContext(stream);
@@ -72,88 +78,113 @@ class AudioRecorder extends StreamlitComponentBase {
         }
     }
 
-    private stopRecording = (): void => {
+    private stopRecording(): void {
         this.setState({ isRecording: false, silentDuration: 0, voiceDetected: false });
-        //console.log("stopRecording entered");
         if (this.audioContext && this.audioContext.state !== "closed") {
             this.audioContext.close();
         }
     }
 
-    private onData(recordedBlob: Blob) {
+    private onData(recordedBlob: Blob): void {
         this.currentRecordedData = recordedBlob;
     }
 
-    private onStop = async (recordedData: ReactMicStopEvent) => {
-        //console.log("onStop entered");
+    private async onStop(recordedData: ReactMicStopEvent): Promise<void> {
         this.processAudio(recordedData.blob);
-    };
+    }
 
-    private processAudio = async (recordedBlob: Blob) => {
+    private async processAudio(recordedBlob: Blob): Promise<void> {
         try {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            const audioContext = new AudioContext({ sampleRate: 16000 });
-
-            const arrayBuffer = await recordedBlob.arrayBuffer();
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-            const offlineAudioContext = new OfflineAudioContext(audioBuffer.numberOfChannels, audioBuffer.length, 16000);
-            const bufferSource = offlineAudioContext.createBufferSource();
-            bufferSource.buffer = audioBuffer;
-            bufferSource.connect(offlineAudioContext.destination);
-            bufferSource.start(0);
-
-            const renderedBuffer = await offlineAudioContext.startRendering();
-
-            // Convert the rendered buffer to a 16-bit PCM byte array
-            const float32Array = renderedBuffer.getChannelData(0);
-            const pcmArrayBuffer = new ArrayBuffer(float32Array.length * 2);
-            const view = new DataView(pcmArrayBuffer);
-
-            for (let i = 0; i < float32Array.length; i++) {
-                const s = Math.max(-1, Math.min(1, float32Array[i]));
-                view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true); // true for little-endian
-            }
+            const audioContext = this.createAudioContext();
+            const audioBuffer = await this.decodeAudioData(audioContext, recordedBlob);
+            const renderedBuffer = await this.applyBandPassFilter(audioBuffer);
+            const pcmArrayBuffer = this.convertToPCM(renderedBuffer);
 
             Streamlit.setComponentValue(pcmArrayBuffer);
         } catch (error) {
             console.error('Error processing audio data:', error);
         }
-    };
+    }
 
-    private initAudioContext(stream: MediaStream) {
+    private createAudioContext(): AudioContext {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        return new AudioContext({ sampleRate: 16000 });
+    }
+
+    private async decodeAudioData(audioContext: AudioContext, recordedBlob: Blob): Promise<AudioBuffer> {
+        const arrayBuffer = await recordedBlob.arrayBuffer();
+        return await audioContext.decodeAudioData(arrayBuffer);
+    }
+
+    private async applyBandPassFilter(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
+        const offlineAudioContext = new OfflineAudioContext(audioBuffer.numberOfChannels, audioBuffer.length, 16000);
+        const bufferSource = offlineAudioContext.createBufferSource();
+        bufferSource.buffer = audioBuffer;
+
+        const bandPassFilter = offlineAudioContext.createBiquadFilter();
+        bandPassFilter.type = "bandpass";
+        bandPassFilter.frequency.value = (this.minVoiceFrequency + this.maxVoiceFrequency) / 2;
+        bandPassFilter.Q.value = (this.maxVoiceFrequency - this.minVoiceFrequency) / (this.minVoiceFrequency + this.maxVoiceFrequency);
+
+        bufferSource.connect(bandPassFilter);
+        bandPassFilter.connect(offlineAudioContext.destination);
+        bufferSource.start(0);
+
+        return await offlineAudioContext.startRendering();
+    }
+
+    private convertToPCM(renderedBuffer: AudioBuffer): ArrayBuffer {
+        const float32Array = renderedBuffer.getChannelData(0);
+        const pcmArrayBuffer = new ArrayBuffer(float32Array.length * 2);
+        const view = new DataView(pcmArrayBuffer);
+
+        for (let i = 0; i < float32Array.length; i++) {
+            const s = Math.max(-1, Math.min(1, float32Array[i]));
+            view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
+
+        return pcmArrayBuffer;
+    }
+
+    private initAudioContext(stream: MediaStream): void {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         this.audioContext = new AudioContext();
         this.analyser = this.audioContext.createAnalyser();
         const source = this.audioContext.createMediaStreamSource(stream);
-        source.connect(this.analyser);
-        this.analyser.fftSize = 2048;
+
+        // Apply noise gate
+        const gainNode = this.audioContext.createGain();
+        gainNode.gain.value = 0.9; // Adjust gain value as needed
+        source.connect(gainNode);
+        gainNode.connect(this.analyser);
+
+        this.analyser.fftSize = 256;
         const bufferLength = this.analyser.frequencyBinCount;
         this.dataArray = new Uint8Array(bufferLength);
         this.monitorSilence();
     }
 
-    private monitorSilence = () => {
+    private monitorSilence = (): void => {
         if (!this.analyser || !this.dataArray) return;
 
         this.analyser.getByteTimeDomainData(this.dataArray);
 
         const volume = this.getVolume();
 
-        if (volume < this.silenceThreshold) {
-            this.setState({ silentDuration: this.state.silentDuration + 1 });
-        } else {
-            this.setState({ silentDuration: 0, voiceDetected: true });
-        }
+        this.setState(prevState => {
+            const silentDuration = volume < this.silenceThreshold ? prevState.silentDuration + 1 : 0;
+            const voiceDetected = volume >= this.silenceThreshold;
 
-        if (this.state.voiceDetected && this.state.silentDuration >= this.silenceTimeout * (this.audioContext?.sampleRate ?? 44100) / this.analyser.fftSize) {
-            if (this.currentRecordedData) {
-                this.stopRecording();
-                this.currentRecordedData = undefined;
-                this.setState({ voiceDetected: false });
-                this.startRecording();
+            if (voiceDetected && silentDuration >= this.silenceTimeout * (this.audioContext?.sampleRate ?? 16000) / this.analyser.fftSize) {
+                if (this.currentRecordedData) {
+                    this.stopRecording();
+                    this.currentRecordedData = undefined;
+                    this.startRecording();
+                }
             }
-        }
+
+            return { silentDuration, voiceDetected };
+        });
 
         requestAnimationFrame(this.monitorSilence);
     };
@@ -175,8 +206,10 @@ class AudioRecorder extends StreamlitComponentBase {
             }
         }
 
-        return sum / count;
+        // Apply noise gate threshold
+        const averageVolume = sum / count;
+        return averageVolume > this.noiseGateThreshold ? averageVolume : 0;
     }
-};
+}
 
 export default withStreamlitConnection(AudioRecorder);
