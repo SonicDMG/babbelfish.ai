@@ -27,6 +27,9 @@ class TranscribeAudio:
         condition (Condition): A condition variable to synchronize threads.
         vad (webrtcvad.Vad): An instance of the WebRTC VAD class.
         audio_buffer (list): Buffer to store audio chunks for processing.
+        audio_queue (Queue): Queue to store audio data for processing.
+        processing_thread (Thread): Thread to process audio data from the queue.
+        stop_event (Event): Event to signal the processing thread to stop.
     
     Methods:
         recognize_speech_from_mic(audio_data):
@@ -47,7 +50,7 @@ class TranscribeAudio:
         stop():
             Stops the recording loop.
     """
-    def __init__(self, samplerate=16000, frame_duration=30, audio_queue=None):
+    def __init__(self, samplerate=16000, frame_duration=30):
         self.samplerate = samplerate
         self.frame_duration = frame_duration
         self.frame_size = int(samplerate * frame_duration / 1000)
@@ -58,7 +61,11 @@ class TranscribeAudio:
         self.vad = webrtcvad.Vad()
         self.vad.set_mode(0)  # 0: least aggressive, 3: most aggressive
         self.audio_buffer = deque()  # Using deque for efficient appends and pops
-        self.audio_queue = audio_queue or queue.Queue()
+        self.audio_queue = queue.Queue()
+        self.stop_event = threading.Event()
+        self.processing_thread = threading.Thread(target=self.process_audio_queue)
+        self.processing_thread.daemon = True
+        self.processing_thread.start()
 
     def audio_to_numpy(self, audio_data):
         """
@@ -146,6 +153,25 @@ class TranscribeAudio:
             logger.info("No meaningful speech detected, just noise")
         return None
 
+    def process_audio_queue(self):
+        """
+        Continuously processes audio data from the queue.
+        """
+        while not self.stop_event.is_set():
+            try:
+                audio_data, speaking_language = self.audio_queue.get(timeout=1)  # Wait for 1 second for new audio data
+                if audio_data:
+                    self.process_audio(audio_data, speaking_language)
+                self.audio_queue.task_done()
+            except queue.Empty:
+                continue
+
+    def add_audio_to_queue(self, audio_data, speaking_language):
+        """
+        Adds audio data to the queue for processing.
+        """
+        self.audio_queue.put((audio_data, speaking_language))
+
     def start(self):
         """
         Starts the recording and recognition process in a separate thread.
@@ -169,3 +195,5 @@ class TranscribeAudio:
         """
         logger.info("Stopping transcription from class...")
         self.is_running = False
+        self.stop_event.set()
+        self.processing_thread.join()
