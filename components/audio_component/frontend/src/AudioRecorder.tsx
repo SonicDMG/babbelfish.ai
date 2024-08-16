@@ -24,23 +24,17 @@ interface ReactMicStopEvent {
     slice: (start?: number, end?: number, contentType?: string) => Blob;
 }
 
-interface AudioRecorderState {
-    isRecording: boolean;
-    silentDuration: number;
-    voiceDetected: boolean;
-}
-
-class AudioRecorder extends StreamlitComponentBase<{}, AudioRecorderState> {
-    public state: AudioRecorderState = { isRecording: false, silentDuration: 0, voiceDetected: false };
+class AudioRecorder extends StreamlitComponentBase {
+    public state = { isRecording: false, silentDuration: 0, voiceDetected: false }
     private audioContext?: AudioContext;
     private analyser?: AnalyserNode;
     private dataArray?: Uint8Array;
-    private silenceThreshold: number = 5;
-    private silenceTimeout: number = 0.1;
-    private minVoiceFrequency: number = 300;
-    private maxVoiceFrequency: number = 3400;
+    private silenceThreshold: number = 1;
+    private silenceTimeout: number = 0.5; // Seconds of silence to detect
+    private minVoiceFrequency: number = 300; // Minimum frequency for human voice in Hz
+    private maxVoiceFrequency: number = 3400; // Maximum frequency for human voice in Hz
     private currentRecordedData?: Blob;
-    private noiseGateThreshold: number = -40; // in decibels
+    private noiseGateThreshold: number = -50; // in decibels
 
     constructor(props: any) {
         super(props);
@@ -154,7 +148,7 @@ class AudioRecorder extends StreamlitComponentBase<{}, AudioRecorderState> {
 
         // Apply noise gate
         const gainNode = this.audioContext.createGain();
-        gainNode.gain.value = 0.9; // Adjust gain value as needed
+        gainNode.gain.value = 0.1; // Adjust gain value as needed
         source.connect(gainNode);
         gainNode.connect(this.analyser);
 
@@ -171,20 +165,20 @@ class AudioRecorder extends StreamlitComponentBase<{}, AudioRecorderState> {
 
         const volume = this.getVolume();
 
-        this.setState(prevState => {
-            const silentDuration = volume < this.silenceThreshold ? prevState.silentDuration + 1 : 0;
-            const voiceDetected = volume >= this.silenceThreshold;
+        if (volume < this.silenceThreshold) {
+            this.setState({ silentDuration: this.state.silentDuration + 1 });
+        } else {
+            this.setState({ silentDuration: 0, voiceDetected: true });
+        }
 
-            if (voiceDetected && silentDuration >= this.silenceTimeout * (this.audioContext?.sampleRate ?? 16000) / this.analyser.fftSize) {
-                if (this.currentRecordedData) {
-                    this.stopRecording();
-                    this.currentRecordedData = undefined;
-                    this.startRecording();
-                }
+        if (this.state.voiceDetected && this.state.silentDuration >= this.silenceTimeout * (this.audioContext?.sampleRate ?? 16000) / this.analyser.fftSize) {
+            if (this.currentRecordedData) {
+                this.stopRecording();
+                this.currentRecordedData = undefined;
+                this.setState({ voiceDetected: false });
+                this.startRecording();
             }
-
-            return { silentDuration, voiceDetected };
-        });
+        }
 
         requestAnimationFrame(this.monitorSilence);
     };
@@ -199,7 +193,7 @@ class AudioRecorder extends StreamlitComponentBase<{}, AudioRecorderState> {
 
         // Calculate the average volume in the range of human voice frequencies
         for (let i = 0; i < this.dataArray.length; i++) {
-            const frequency = i * (this.audioContext?.sampleRate ?? 44100) / this.analyser.fftSize;
+            const frequency = i * (this.audioContext?.sampleRate ?? 16000) / this.analyser.fftSize;
             if (frequency >= this.minVoiceFrequency && frequency <= this.maxVoiceFrequency) {
                 sum += this.dataArray[i];
                 count++;

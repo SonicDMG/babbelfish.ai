@@ -8,10 +8,21 @@ from langflow_runner import LangflowRunner
 from listen_and_convert import TranscribeAudio
 from components.audio_component import audio_component
 from components.elevenlabs_component import elevenlabs_component
+import threading
 
 # Configure logger
 logger = logging.getLogger("BabbelfishLogger")
-coloredlogs.install(level='DEBUG', logger=logger, fmt='%(levelname)s %(message)s')
+coloredlogs.install(level='INFO',
+                    logger=logger,
+                    fmt='%(filename)s %(levelname)s %(message)s',
+                    level_styles={
+                        'debug': {'color': 'green'},
+                        'info': {'color': 'blue'},
+                        'warning': {'color': 'yellow'},
+                        'error': {'color': 'red'},
+                        'critical': {'color': 'magenta'}
+                    }
+)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,7 +34,8 @@ LANGUAGE_TO_SPEAK = os.getenv('LANGUAGE_TO_SPEAK')
 
 # -------------- Streamlit app config ---------------
 st.set_page_config(page_title="Babbelfish.ai", page_icon="🐠", layout="wide")
-logger.info("\n\n--- Streamlit start app ---")
+logger.info("\n\n")
+logger.info("--- Streamlit start app ---")
 
 # -------------- Initialize session state variables ---------------
 session_vars = {
@@ -94,6 +106,8 @@ st.markdown('<div class="fixed-header"><h1>Babbelfish.ai 💬🐠💬</h1></div>
 chat_placeholder = st.empty()
 
 # -------------- Render chat messages ---------------
+lock = threading.Lock()
+
 def render_chat():
     """Render chat messages in a scrollable container."""
     with chat_placeholder.container():
@@ -122,11 +136,6 @@ render_chat()
 def translate_speech(flow_id: str, message: str, language_to_speak: str) -> dict:
     """
     Translate the given message to the specified language using Langflow.
-
-    :param flow_id: The ID of the Langflow flow.
-    :param message: The message to translate.
-    :param language_to_speak: The language to translate the message to.
-    :return: A dictionary containing the translation and other metadata.
     """
     tweaks = {
         "TextInput-JKRiD": {
@@ -137,6 +146,14 @@ def translate_speech(flow_id: str, message: str, language_to_speak: str) -> dict
     api_key = None
 
     flow_runner = LangflowRunner(flow_id=flow_id, api_key=api_key, tweaks=tweaks)
+    # Async version
+    #flow_runner.run_flow_async(message=message)  # Use the async method instead
+    #response_json = flow_runner.get_response()   # Wait for the async response
+    
+    #results = flow_runner.extract_output_message(response_json)
+    #return results
+
+    # Sync version    
     response_json = flow_runner.run_flow(message=message)
     
     results = flow_runner.extract_output_message(response_json)
@@ -145,19 +162,15 @@ def translate_speech(flow_id: str, message: str, language_to_speak: str) -> dict
 def chat_message_write(role: str, content: str):
     """
     Write a chat message to the session state and re-render the chat.
-
-    :param role: The role of the message sender (e.g., "user" or "assistant").
-    :param content: The content of the message.
     """
-    st.session_state.messages.append({"role": role, "content": content})
-    render_chat()  # Re-render chat messages after adding a new message
+    with lock:
+        st.session_state.messages.append({"role": role, "content": content})
+        render_chat()  # Re-render chat messages after adding a new message
 
 # -------------- Call chat_and_speak based on input message ---------------
 def chat_and_speak(in_message: str):
     """
     Handle chat input, translate it, and update the session state.
-
-    :param in_message: The input message from the user.
     """
     chat_message_write("user", in_message)
     response = translate_speech(FLOW_ID or "", in_message, st.session_state.language)
@@ -179,10 +192,6 @@ def chat_and_speak(in_message: str):
 def transcribe_audio(transcriber: TranscribeAudio, is_recording: bool, language: str = ""):
     """
     Start or stop the transcription process based on the recording state.
-
-    :param transcriber: The TranscribeAudio instance.
-    :param language: The language to transcribe.
-    :param is_recording: The recording state.
     """
     if is_recording:
         transcriber.start()

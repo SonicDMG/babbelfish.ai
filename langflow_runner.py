@@ -2,6 +2,7 @@
 import os
 import logging
 from typing import Optional, Dict, Any
+import threading
 from dotenv import load_dotenv
 import requests
 import coloredlogs
@@ -15,7 +16,17 @@ if not BASE_API_URL:
 
 # Configure logging
 logger = logging.getLogger(__name__)
-coloredlogs.install(level='INFO', logger=logger, fmt='%(levelname)s %(message)s')
+coloredlogs.install(level='INFO',
+                    logger=logger,
+                    fmt='%(filename)s %(levelname)s %(message)s',
+                    level_styles={
+                        'debug': {'color': 'green'},
+                        'info': {'color': 'blue'},
+                        'warning': {'color': 'yellow'},
+                        'error': {'color': 'red'},
+                        'critical': {'color': 'magenta'}
+                    }
+)
 
 class LangflowRunner:
     """A class to handle running the babblefish flow and extracting responses."""
@@ -34,6 +45,8 @@ class LangflowRunner:
         self.flow_id = flow_id
         self.api_key = api_key
         self.tweaks = tweaks
+        self.condition = threading.Condition()
+        self.response = None
 
     def run_flow(self,
                  message: str,
@@ -62,11 +75,39 @@ class LangflowRunner:
 
         try:
             response = requests.post(api_url, json=payload, headers=headers, timeout=30)
-            #response.raise_for_status()  # Raise an HTTPError for bad responses
             return response.json()
         except requests.RequestException as e:
             logger.error("Request failed: %s", e)
-            #raise
+            return {}
+
+    def run_flow_async(self, message: str, output_type: str = "chat", input_type: str = "chat"):
+        """
+        Run a flow asynchronously with a given message and optional tweaks.
+
+        :param message: The message to send to the flow.
+        :param output_type: The type of output expected (default is "chat").
+        :param input_type: The type of input provided (default is "chat").
+        """
+        def api_thread():
+            result = self.run_flow(message, output_type, input_type)
+            with self.condition:
+                self.response = result
+                self.condition.notify()
+
+        thread = threading.Thread(target=api_thread)
+        thread.start()
+
+    def get_response(self) -> Dict[str, Any]:
+        """
+        Get the response from the asynchronous flow run.
+
+        :return: The JSON response from the flow.
+        """
+        with self.condition:
+            self.condition.wait()
+            response = self.response
+            self.response = None
+            return response or {}
 
     def extract_output_message(self, response_json: Dict[str, Any]) -> Dict[str, str]:
         """
