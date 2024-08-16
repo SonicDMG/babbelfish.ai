@@ -83,7 +83,7 @@ class AudioRecorder extends StreamlitComponentBase {
         this.currentRecordedData = recordedBlob;
     }
 
-    private async onStop(recordedData: ReactMicStopEvent): Promise<void> {
+    private onStop(recordedData: ReactMicStopEvent): void {
         this.processAudio(recordedData.blob);
     }
 
