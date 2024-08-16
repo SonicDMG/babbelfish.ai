@@ -1,4 +1,9 @@
 {
+  "engines": {
+    "node": "20.12.2",
+    "npm": "10.7.0"
+  },
+
   "name": "my_component",
   "version": "0.1.0",
   "private": true,
