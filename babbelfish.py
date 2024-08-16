@@ -1,6 +1,7 @@
 """An application to translate any language to any other language using Langflow and Streamlit."""
 import os
 import logging
+import threading
 import streamlit as st
 from dotenv import load_dotenv
 import coloredlogs
@@ -8,7 +9,6 @@ from langflow_runner import LangflowRunner
 from listen_and_convert import TranscribeAudio
 from components.audio_component import audio_component
 from components.elevenlabs_component import elevenlabs_component
-import threading
 
 # Configure logger
 logger = logging.getLogger("BabbelfishLogger")
@@ -138,7 +138,7 @@ def translate_speech(flow_id: str, message: str, language_to_speak: str) -> dict
     Translate the given message to the specified language using Langflow.
     """
     tweaks = {
-        "TextInput-JKRiD": {
+        "TextInput-UFUC6": {
             "input_value": f"{language_to_speak}"
         }
     }
