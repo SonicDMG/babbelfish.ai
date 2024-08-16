@@ -207,7 +207,7 @@ nanoid==2.0.0
 narwhals==1.4.0
 nest-asyncio==1.6.0
 networkx==3.3
-nltk==3.8.2
+nltk==3.7
 nodeenv==1.9.1
 numexpr==2.10.1
 numpy==1.26.4
