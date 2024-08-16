@@ -9,6 +9,18 @@ declare global {
     }
 }
 
+export interface ReactMicStopEvent {
+    blob: Blob;
+    startTime: number;
+    stopTime: number;
+    option: {
+        audioBitsPerSecond: number;
+        mimeType: string;
+    };
+    blobURL: string;
+}
+
+/*
 interface ReactMicStopEvent {
     blob: Blob;
     startTime: string;
@@ -23,6 +35,7 @@ interface ReactMicStopEvent {
     arrayBuffer: () => Promise<ArrayBuffer>;
     slice: (start?: number, end?: number, contentType?: string) => Blob;
 }
+*/
 
 class AudioRecorder extends StreamlitComponentBase {
     public state = { isRecording: false, silentDuration: 0, voiceDetected: false }
@@ -85,7 +98,7 @@ class AudioRecorder extends StreamlitComponentBase {
 
     private onStop(recordedData: ReactMicStopEvent): void {
         this.processAudio(recordedData.blob);
-    }
+    }  
 
     private async processAudio(recordedBlob: Blob): Promise<void> {
         try {
