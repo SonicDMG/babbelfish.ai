@@ -9,7 +9,7 @@ declare global {
     }
 }
 
-const XI_API_KEY = process.env.XI_API_KEY;
+const XI_API_KEY = process.env.REACT_APP_XI_API_KEY;
 
 if (!XI_API_KEY) {
     throw new Error("Missing XI_API_KEY in environment variables");
