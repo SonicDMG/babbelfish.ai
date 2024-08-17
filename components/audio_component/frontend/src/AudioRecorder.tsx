@@ -20,23 +20,6 @@ export interface ReactMicStopEvent {
     blobURL: string;
 }
 
-/*
-interface ReactMicStopEvent {
-    blob: Blob;
-    startTime: string;
-    stopTime: string;
-    options: {
-        audioBitsPerSecond: number;
-        mimeType: string;
-    };
-    blobURL: string;
-    size: number;
-    type: string;
-    arrayBuffer: () => Promise<ArrayBuffer>;
-    slice: (start?: number, end?: number, contentType?: string) => Blob;
-}
-*/
-
 class AudioRecorder extends StreamlitComponentBase {
     public state = { isRecording: false, silentDuration: 0, voiceDetected: false }
     private audioContext?: AudioContext;
