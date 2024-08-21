@@ -51,6 +51,10 @@ Babbelfish.ai is a Streamlit-based translation chatbot powered by Langflow. It a
 
 4. Type your message in the chat input or use the voice translation feature.
 
+## Langflow
+In order to fully run Babbelfish.ai, you will need to host Langflow. [Langflow](https://langflow.org) is a free, open source tool that allows you visually build Generative AI workflows. Once you have Langflow installed, download the included [Babbelfish.ai.json](https://github.com/SonicDMG/babbelfish.ai/blob/main/Babbelfish.ai.json) file and upload it in your Langflow instance.
+
+
 ## Logging
 The application uses `coloredlogs` for logging. Logs are displayed in the terminal with different colors based on the log level.
 
