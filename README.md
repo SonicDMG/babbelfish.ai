@@ -14,7 +14,7 @@ Babbelfish.ai is a Streamlit-based translation chatbot powered by Langflow. It a
 ## Installation
 
 ### Prerequisites
-- Python 3.10 or higher
+- Python 3.11 or higher
 - Streamlit
 - Langflow
 - ElevenLabs.io API key
@@ -27,20 +27,20 @@ Babbelfish.ai is a Streamlit-based translation chatbot powered by Langflow. It a
 	cd babbelfish.ai
 	```
 
-2. Install the required packages:
-	```sh
-	pip install -r requirements.txt
-	```
-
-3. Create a `.env` file in the root directory by copying the `.env.example` file and updating the environment variables:
+2. Create a `.env` file in the root directory by copying the `.env.example` file and updating the environment variables:
     ```sh
     cp .env.example .env
     ```
+    
+3. Install the required packages:
+	```sh
+	pip install -r requirements.txt && cd components && npm install --prefix elevenlabs_component/frontend && npm run build --prefix elevenlabs_component/frontend && npm install --prefix audio_component/frontend && npm run build --prefix audio_component/frontend
+	```
 
 ## Usage
 1. Run the Streamlit application:
 	```sh
-	streamlit run app.py
+	streamlit run babbelfish.py
 	```
 
 2. Open your web browser and navigate to `http://localhost:8501`.
@@ -53,7 +53,7 @@ Babbelfish.ai is a Streamlit-based translation chatbot powered by Langflow. It a
 The application uses `coloredlogs` for logging. Logs are displayed in the terminal with different colors based on the log level.
 
 ## File Structure
-- `app.py`: Main application file.
+- `babbelfish.py`: Main application file.
 - `babbelfish_flow.py`: Contains the LangflowRunner class for interacting with Langflow.
 - `listen_and_convert.py`: Contains the TranscribeAudio class for handling audio transcription.
 - `components/`: Contains Streamlit components for audio and ElevenLabs integration.
