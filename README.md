@@ -3,6 +3,8 @@
 ## Overview
 Babbelfish.ai is a Streamlit-based translation chatbot powered by Langflow. It allows users to translate text and speech into various languages, detect the language of the input, analyze sentiment, and provide explanations. The application also supports voice translation using ElevenLabs.io.
 
+![Babbelfish demo gif](https://raw.githubusercontent.com/SonicDMG/babbelfish.ai/main/static/babbelfish.gif)
+
 ## Features
 - **Text Translation**: Translate text into multiple languages.
 - **Voice Translation**: Translate spoken words into different languages.
