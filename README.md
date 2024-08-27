@@ -29,21 +29,13 @@ Babbelfish.ai is a Streamlit-based translation chatbot powered by Langflow. It a
 	cd babbelfish.ai
 	```
 
-2. Create a `.env` file in the root directory by copying the `.env.example` file and updating the environment variables:
-    ```sh
-    cp .env.example .env
-    ```
-    
-3. Install the required packages:
-	```sh
-	pip install -r requirements.txt && cd components && npm install --prefix elevenlabs_component/frontend && npm run build --prefix elevenlabs_component/frontend && npm install --prefix audio_component/frontend && npm run build --prefix audio_component/frontend
-	```
+2. Run `install.sh` to
+- Create a `.env` file in the root directory (a copy of the `.env.example` file)
+- Install the required python packages
+- Install the required npm packages
 
 ## Usage
-1. Run the Streamlit application:
-	```sh
-	streamlit run babbelfish.py
-	```
+1. Run `run.sh` to launch the Streamlit application:
 
 2. Open your web browser and navigate to `http://localhost:8501`.
 
